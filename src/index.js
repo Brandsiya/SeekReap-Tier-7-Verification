@@ -16,15 +16,11 @@ async function runAudit() {
     const client = await pool.connect();
     try {
         const { rows } = await client.query(`
-            UPDATE content_submissions
-            SET status = 'processing'
-            WHERE submission_id IN (
-                SELECT submission_id FROM content_submissions
-                WHERE status = 'pending'
-                LIMIT $1
-                FOR UPDATE SKIP LOCKED
-            )
-            RETURNING submission_id, content_hash, creator_id
+            SELECT submission_id, content_hash, creator_id
+            FROM content_submissions
+            WHERE status = 'pending'
+            LIMIT $1
+            FOR UPDATE SKIP LOCKED
         `, [BATCH_SIZE]);
 
         if (!rows || rows.length === 0) {
@@ -39,12 +35,11 @@ async function runAudit() {
 
             await client.query(`
                 UPDATE content_submissions
-                SET status = 'completed',
-                    verified = $1
-                WHERE submission_id = $2
-            `, [auditResult, submission.submission_id]);
+                SET status = 'verified'
+                WHERE submission_id = $1
+            `, [submission.submission_id]);
 
-            console.log(`✅ Audit Complete: ${submission.submission_id} (Result: ${auditResult})`);
+            console.log(`✅ Audit Complete: ${submission.submission_id} (verified: ${auditResult})`);
         }
     } catch (err) {
         console.error('❌ Audit error:', err.message);
