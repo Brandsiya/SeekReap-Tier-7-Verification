@@ -1,25 +1,32 @@
 import supabase from '../../config/supabaseClient.js';
 
-export async function fetchUnverifiedContent() {
-    console.log("📥 Fetching queue from Supabase...");
+export async function fetchUnverifiedContent(limit = 5) {
+    console.log("📥 Fetching unverified batch...");
 
-    const BATCH_SIZE = parseInt(process.env.BATCH_SIZE) || 5;
-
+    // 1. Find items not verified and not already being handled
     const { data, error } = await supabase
-        .from('works')
-        .select('id, fingerprint')
+        .from('content_submissions')
+        .select('*')
         .eq('verified', false)
-        .limit(BATCH_SIZE);
+        .eq('processing', false) 
+        .limit(limit);
 
     if (error) {
-        console.error("❌ Supabase fetch error:", error.message);
+        console.error("❌ Fetch error:", error.message);
         return [];
     }
 
-    if (!data || data.length === 0) return [];
+    if (data && data.length > 0) {
+        const ids = data.map(item => item.submission_id || item.id);
+        
+        // 2. Immediate Lock: prevent other workers from grabbing these
+        await supabase
+            .from('content_submissions')
+            .update({ processing: true })
+            .in('id', ids); // Adjust to 'submission_id' if that is your PK
+            
+        console.log(`🔒 Locked ${data.length} items for parallel processing.`);
+    }
 
-    return data.map(item => ({
-        work_id: item.id,
-        fingerprint: item.fingerprint
-    }));
+    return data || [];
 }
