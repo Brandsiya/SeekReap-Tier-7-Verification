@@ -2,21 +2,22 @@ import { fetchUnverifiedContent } from '../src/ingest/fetchQueue.js';
 import { detectContentUsage } from '../src/detector/detect.js';
 import { verifyUsage } from '../src/verifier/verify.js';
 import { recordEvent } from '../src/events/record.js';
-import { markWorkAsVerified } from '../src/events/markVerified.js';
+import { markVerified } from '../src/events/markVerified.js';
 
 const activeJobs = new Set();
 
 export async function startScanWorker() {
     console.log("🔍 Scan Worker running...");
 
+    const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL) || 10000;
+
     setInterval(async () => {
         console.log("⏱ Worker tick...");
-
         try {
             const queue = await fetchUnverifiedContent();
 
             if (!queue || queue.length === 0) {
-                console.log("📭 Queue empty, waiting...");
+                console.log("📭 Queue empty");
                 return;
             }
 
@@ -35,12 +36,15 @@ export async function startScanWorker() {
 
                     if (!detections || detections.length === 0) {
                         console.log(`❌ No detections for: ${item.work_id}`);
-                        await markWorkAsVerified(item.work_id);
                         continue;
                     }
 
+                    let verifiedAny = false;
+
                     for (const match of detections) {
                         const result = await verifyUsage(match);
+
+                        if (result.status === 'verified') verifiedAny = true;
 
                         await recordEvent({
                             work_id: item.work_id,
@@ -51,7 +55,8 @@ export async function startScanWorker() {
                         });
                     }
 
-                    await markWorkAsVerified(item.work_id);
+                    if (verifiedAny) await markVerified(item.work_id);
+
                     console.log(`✅ Completed: ${item.work_id}`);
 
                 } catch (err) {
@@ -60,10 +65,8 @@ export async function startScanWorker() {
                     activeJobs.delete(item.work_id);
                 }
             }
-
         } catch (err) {
             console.error("🔥 Worker cycle failure:", err.message);
         }
-
-    }, 10000);
+    }, POLL_INTERVAL);
 }

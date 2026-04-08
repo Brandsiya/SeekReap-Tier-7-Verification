@@ -1,13 +1,15 @@
 import supabase from '../../config/supabaseClient.js';
 
 export async function fetchUnverifiedContent() {
-    console.log("📥 Fetching unverified queue from Supabase...");
+    console.log("📥 Fetching queue from Supabase...");
+
+    const BATCH_SIZE = parseInt(process.env.BATCH_SIZE) || 5;
 
     const { data, error } = await supabase
-        .from('content_submissions')
+        .from('works')
         .select('id, fingerprint')
         .eq('verified', false)
-        .limit(10);
+        .limit(BATCH_SIZE);
 
     if (error) {
         console.error("❌ Supabase fetch error:", error.message);
