@@ -7,8 +7,10 @@ export async function markVerified(work_id) {
         .eq('id', work_id);
 
     if (error) {
-        console.error(`❌ Failed to mark verified: ${work_id}`, error.message);
-    } else {
-        console.log(`✅ Work marked verified: ${work_id}`);
+        console.error(`❌ Error marking work ${work_id} as verified:`, error.message);
+        return false;
     }
+
+    console.log(`✅ Work ${work_id} marked as verified`);
+    return true;
 }
