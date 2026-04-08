@@ -17,14 +17,14 @@ async function runAudit() {
     try {
         const { rows } = await client.query(`
             UPDATE content_submissions
-            SET audit_status = 'processing'
-            WHERE id IN (
-                SELECT id FROM content_submissions
-                WHERE audit_status = 'pending'
+            SET status = 'processing'
+            WHERE submission_id IN (
+                SELECT submission_id FROM content_submissions
+                WHERE status = 'pending'
                 LIMIT $1
                 FOR UPDATE SKIP LOCKED
             )
-            RETURNING id, title, fingerprint
+            RETURNING submission_id, content_hash, creator_id
         `, [BATCH_SIZE]);
 
         if (!rows || rows.length === 0) {
@@ -33,20 +33,18 @@ async function runAudit() {
         }
 
         for (const submission of rows) {
-            console.log(`🚀 Auditing Submission: ${submission.id}`);
-            console.log(`📡 Scanning platforms for: "${submission.title}"...`);
+            console.log(`🚀 Auditing Submission: ${submission.submission_id}`);
 
             const auditResult = false;
 
             await client.query(`
                 UPDATE content_submissions
-                SET audit_status = 'completed',
-                    verified = $1,
-                    verified_at = NOW()
-                WHERE id = $2
-            `, [auditResult, submission.id]);
+                SET status = 'completed',
+                    verified = $1
+                WHERE submission_id = $2
+            `, [auditResult, submission.submission_id]);
 
-            console.log(`✅ Audit Complete: ${submission.id} (Result: ${auditResult})`);
+            console.log(`✅ Audit Complete: ${submission.submission_id} (Result: ${auditResult})`);
         }
     } catch (err) {
         console.error('❌ Audit error:', err.message);
