@@ -18,7 +18,6 @@ const pool = new Pool({
 const BATCH_SIZE    = parseInt(process.env.BATCH_SIZE)    || 5;
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL) || 10000;
 
-// Guard: prevent overlapping audit runs
 let running = false;
 
 async function runAudit() {
@@ -28,8 +27,9 @@ async function runAudit() {
   }
   running = true;
 
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
 
     const { rows } = await client.query(
@@ -67,15 +67,14 @@ async function runAudit() {
     console.log(`Committed ${rows.length} verifications`);
 
   } catch (err) {
-    try { await client.query('ROLLBACK'); } catch (_) {}
+    if (client) try { await client.query('ROLLBACK'); } catch (_) {}
     console.error('Audit error:', err.message);
   } finally {
-    client.release();
+    if (client) client.release();
     running = false;
   }
 }
 
-// Health server
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
