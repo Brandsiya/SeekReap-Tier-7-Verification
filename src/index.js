@@ -7,6 +7,8 @@ if (!DB) { console.error('DATABASE_URL not set'); process.exit(1); }
 
 console.log('DB prefix:', DB.slice(0, 40));
 
+console.log('DB host:', new URL(DB).hostname);
+
 const pool = new Pool({
   connectionString: DB,
   ssl: {
