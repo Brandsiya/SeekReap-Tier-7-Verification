@@ -9,7 +9,9 @@ console.log('DB prefix:', DB.slice(0, 40));
 
 const pool = new Pool({
   connectionString: DB,
-  ssl: { rejectUnauthorized: true },
+  ssl: {
+    rejectUnauthorized: false
+  },
   max: 5,
   connectionTimeoutMillis: 10000,
 });
